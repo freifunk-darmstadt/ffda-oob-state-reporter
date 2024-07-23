@@ -28,8 +28,9 @@ static int fosr_udp_submit_getaddr(int family, const char *host, uint16_t port, 
 
 int fosr_udp_submit(struct fosr *fosr, struct fosr_metrics *metrics)
 {
-	uint8_t submission_bufffer[3];
+	uint8_t submission_bufffer[6];
 	struct addrinfo *res = NULL;
+	uint16_t reporter_id;
 	int ret = 0;
 	int fd = -1;
 
@@ -46,9 +47,17 @@ int fosr_udp_submit(struct fosr *fosr, struct fosr_metrics *metrics)
 		goto out_free;
 	}
 
-	submission_bufffer[0] = (uint8_t)metrics->soc;
-	submission_bufffer[1] = metrics->charging ? 0xff : 0x00;
-	submission_bufffer[2] = (uint8_t)metrics->temperature;
+	/* Protocol version */
+	submission_bufffer[0] = 1;
+
+	/* Reporter ID */
+	reporter_id = htons(fosr->config.reporter_id);
+	memcpy(&submission_bufffer[1], &reporter_id, sizeof(fosr->config.reporter_id));
+
+	/* Metrics */
+	submission_bufffer[3] = (uint8_t)metrics->soc;
+	submission_bufffer[4] = metrics->charging ? 0xff : 0x00;
+	submission_bufffer[5] = (uint8_t)metrics->temperature;
 
 	if (sendto(fd, submission_bufffer, sizeof(submission_bufffer), 0, res->ai_addr, res->ai_addrlen) < 0) {
 		/* Don't be spammy, we have retry */

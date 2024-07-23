@@ -81,9 +81,10 @@ static void fosr_work(struct uloop_timeout *timeout)
 
 static int fosr_parse_config(struct fosr *fosr, int argc, char *argv[])
 {
+	int reporter_id = 0;
 	int c;
 
-	while ((c = getopt (argc, argv, "h:i:l:p:s")) != -1) {
+	while ((c = getopt (argc, argv, "h:i:l:p:r:s")) != -1) {
 		switch (c){
 			case 'h':
 				fosr->config.host = optarg;
@@ -96,6 +97,9 @@ static int fosr_parse_config(struct fosr *fosr, int argc, char *argv[])
 				break;
 			case 'p':
 				fosr->config.port = atoi(optarg);
+				break;
+			case 'r':
+				reporter_id = atoi(optarg);
 				break;
 			case 's':
 				fosr_log_set_syslog(1);
@@ -126,6 +130,18 @@ static int fosr_parse_config(struct fosr *fosr, int argc, char *argv[])
 		MSG(ERROR, "Interval too low. Minimum: 30\n");
 		return 1;
 	}
+
+	if (!reporter_id) {
+		MSG(ERROR, "Missing reporter id\n");
+		return 1;
+	}
+
+	if (reporter_id < 0 || reporter_id > 65535) {
+		MSG(ERROR, "Invalid reporter id. Minimum: 0, Maximum: 65535\n");
+		return 1;
+	}
+
+	fosr->config.reporter_id = reporter_id;
 
 	return 0;
 }

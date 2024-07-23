@@ -17,6 +17,8 @@ struct fosr_config {
     const char *host;
     uint16_t port;
     int32_t interval;
+
+    uint16_t reporter_id;
 };
 
 enum fosr_submission_reason {

@@ -10,17 +10,19 @@ start_service() {
 	local port="$(uci -q get ffda-oob-state-reporter.core.port)"
 	local interval="$(uci -q get ffda-oob-state-reporter.core.interval)"
 	local log_level="$(uci -q get ffda-oob-state-reporter.core.log_level)"
+	local reporter_id="$(uci -q get ffda-oob-state-reporter.core.reporter_id)"
 
 	[ -z "$interval" ] && interval=600
 	[ -z "$port" ] && port=1234
 	[ -z "$host" ] && return
 
 	[ -z "$log_level" ] && log_level=3
+	[ -z "$reporter_id" ] && return
 
 	[ "$enabled" -gt 0 ] || return
 
 	procd_open_instance
-	procd_set_param command /sbin/ffda-oob-state-reporter -s -i "$interval" -h "$host" -p "$port" -l "$log_level"
+	procd_set_param command /sbin/ffda-oob-state-reporter -s -i "$interval" -h "$host" -p "$port" -l "$log_level" -r "$reporter_id"
 	procd_set_param respawn 60 5 5
 	procd_close_instance
 }
