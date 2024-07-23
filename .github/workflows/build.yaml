@@ -1,0 +1,29 @@
+name: Build package
+on: [ push, pull_request]
+jobs:
+  build:
+    name: ${{ matrix.arch }} ${{ matrix.release }} build
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        arch:
+          - mips_24kc
+        release:
+          - '23.05.2'
+          - '23.05.3'
+          - '23.05.4'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Build
+        uses: openwrt/gh-action-sdk@v7
+        env:
+          ARCH: ${{ matrix.arch }}-${{ matrix.release }}
+          FEEDNAME: packages_ci
+          PACKAGES: "ffda-oob-state-reporter"
+          V: s
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch}}-${{ matrix.release }}-packages
+          path: bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
