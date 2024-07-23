@@ -15,6 +15,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Set package version
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        run: |
+          sed -i "s/PKG_VERSION:=.*/PKG_VERSION=${GITHUB_REF_NAME}-${{ matrix.release }}/g" openwrt/ffda-oob-state-reporter/Makefile
       - name: Build
         uses: openwrt/gh-action-sdk@v7
         env:
@@ -27,3 +31,29 @@ jobs:
         with:
           name: ${{ matrix.arch}}-${{ matrix.release }}-packages
           path: bin/packages/${{ matrix.arch }}/packages_ci/*.ipk
+
+  release:
+    name: Release package
+    runs-on: ubuntu-24.04
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: "gha-data/artifact-download"
+      - name: Show directory structure
+        run: |
+          find ./gha-data/artifact-download
+      - name: Combine artifacts
+        run: |
+          mkdir -p gha-data/artifact-release
+          find ./gha-data/artifact-download -type f -exec cp -t gha-data/artifact-release "{}" \+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: ${{ github.ref_name }}
+          files: |
+            gha-data/artifact-release/*
