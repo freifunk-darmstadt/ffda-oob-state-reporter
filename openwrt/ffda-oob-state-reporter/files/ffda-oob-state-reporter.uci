@@ -1,0 +1,5 @@
+config core 'core'
+	option enabled '0'
+	option host '10.66.225.69'
+	option port '1234'
+	option interval '600'
