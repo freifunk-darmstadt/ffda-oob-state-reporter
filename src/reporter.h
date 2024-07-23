@@ -19,6 +19,11 @@ struct fosr_config {
     int32_t interval;
 };
 
+enum fosr_submission_reason {
+    FOSR_SUBMISSION_REASON_SOC = 1 << 0,
+    FOSR_SUBMISSION_REASON_CHARGING = 1 << 1,
+    FOSR_SUBMISSION_REASON_INTERVAL = 1 << 2,
+};
 
 struct fosr {
     struct ubus_context ctx;
@@ -27,11 +32,13 @@ struct fosr {
 
     struct fosr_config config;
 
-    struct fosr_metrics metrics;
-    uint8_t metrics_updated;
+    struct {
+        struct fosr_metrics current;
+        struct fosr_metrics last_submitted;
+    } metrics;
 
-    uint8_t pending_submission;
-    unsigned long last_submission;
+
+    unsigned long last_interval_submission;
 
     struct uloop_timeout work_timeout;
 };

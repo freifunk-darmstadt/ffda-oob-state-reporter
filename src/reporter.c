@@ -6,7 +6,6 @@
 #include "ubus.h"
 #include "udp.h"
 
-#define FOSR_SUBMISSION_RETRY 60
 
 static int fosr_metrics_submit(struct fosr *fosr, struct fosr_metrics *metrics)
 {
@@ -17,9 +16,39 @@ static int fosr_metrics_submit(struct fosr *fosr, struct fosr_metrics *metrics)
 	return fosr_udp_submit(fosr, metrics);
 }
 
+static uint32_t fosr_should_submit(struct fosr *fosr)
+{
+	struct fosr_metrics *current = &fosr->metrics.current;
+	struct fosr_metrics *last_submitted = &fosr->metrics.last_submitted;
+	uint32_t submission_reasons;
+
+	submission_reasons = 0;
+
+	/* Submit if charging-state changed */
+	if (current->charging != last_submitted->charging) {
+		MSG(INFO, "Charging status changed: charging=%u\n", current->charging);
+		submission_reasons |= FOSR_SUBMISSION_REASON_CHARGING;
+	}
+
+	/* Submit if state-of-charge changed on battery */
+	if (!current->charging && current->soc != last_submitted->soc) {
+		MSG(INFO, "SOC changed on battery: soc=%u\n", current->soc);
+		submission_reasons |= FOSR_SUBMISSION_REASON_SOC;
+	}
+
+	/* Submit in configured interval */
+	if (!fosr->last_interval_submission || fosr->sysinfo.uptime - fosr->last_interval_submission > fosr->config.interval) {
+		MSG(INFO, "Submission interval reached\n");
+		submission_reasons |= FOSR_SUBMISSION_REASON_INTERVAL;
+	}
+
+	return submission_reasons;
+}
+
 static void fosr_work(struct uloop_timeout *timeout)
 {
 	struct fosr *fosr = container_of(timeout, struct fosr, work_timeout);
+	uint32_t should_submit;
 	int ret;
 
 	/* Update system uptime */
@@ -28,35 +57,22 @@ static void fosr_work(struct uloop_timeout *timeout)
 	/* Always update battery status */
 	fosr_ubus_battery_status_update(fosr);
 
-	/* Update metrics if changed */
-	if (fosr->metrics_updated) {
-		fosr->metrics_updated = 0;
-		fosr->pending_submission = FOSR_SUBMISSION_RETRY;
-		MSG(DEBUG, "MCU reported changed metrics\n");
-	}
+	/* Check if metrics should be submitted */
+	should_submit = fosr_should_submit(fosr);
 
-	/* Regular update interval */
-	if (!fosr->last_submission || fosr->sysinfo.uptime - fosr->last_submission > fosr->config.interval) {
-		fosr->last_submission = fosr->sysinfo.uptime;
-		fosr->pending_submission = FOSR_SUBMISSION_RETRY;
-		MSG(DEBUG, "Metrics submission interval reached\n");
-	}
-
-	if (fosr->pending_submission) {
-		/* Attempt to send */
-		ret = fosr_metrics_submit(fosr, &fosr->metrics);
-		fosr->pending_submission--;
-
+	if (should_submit) {
+		/* Submit metrics */
+		ret = fosr_metrics_submit(fosr, &fosr->metrics.current);
 		if (ret) {
-			/* Could not send - Don't spam log despite error */
-			MSG(DEBUG, "Failed to submit metrics\n");
-			if (!fosr->pending_submission) {
-				MSG(ERROR, "Failed to submit metrics - Retries exceeded\n");
-			}
-		} else {
-			MSG(INFO, "Metrics submitted soc=%u, charging=%u, temperature=%.2f\n",
-			    fosr->metrics.soc, fosr->metrics.charging, fosr->metrics.temperature);
-			fosr->pending_submission = 0;
+			MSG(ERROR, "Failed to submit metrics\n");
+		}
+
+		/* Update last submitted metrics*/
+		memcpy(&fosr->metrics.last_submitted, &fosr->metrics.current, sizeof(fosr->metrics.current));
+
+		/* Update last-interval submission */
+		if (should_submit & FOSR_SUBMISSION_REASON_INTERVAL) {
+			fosr->last_interval_submission = fosr->sysinfo.uptime;
 		}
 	}
 

@@ -57,17 +57,7 @@ static void fosr_ubus_battery_status_update_cb(struct ubus_request *req, int typ
 
 	MSG(DEBUG, "Battery status: soc=%u, charging=%u, temperature=%.2f\n", metrics.soc, metrics.charging, metrics.temperature);
 
-	if (metrics.charging != fosr->metrics.charging) {
-		MSG(INFO, "Charging status changed: charging=%u\n", metrics.charging);
-		fosr->metrics_updated = 1;
-	}
-
-	if (!metrics.charging && metrics.soc != fosr->metrics.soc) {
-		MSG(INFO, "SOC changed on battery: soc=%u\n", metrics.soc);
-		fosr->metrics_updated = 1;
-	}
-
-	memcpy(&fosr->metrics, &metrics, sizeof(metrics));
+	memcpy(&fosr->metrics.current, &metrics, sizeof(metrics));
 }
 
 int fosr_ubus_battery_status_update(struct fosr *fosr)
